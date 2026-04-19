@@ -328,6 +328,5 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
 
 **[⬆ Back to Top](#-cairnsearch)**
 
-Made with ❤️ for privacy
 
 </div>
