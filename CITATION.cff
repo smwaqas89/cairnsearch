@@ -5,6 +5,7 @@ type: software
 authors:
   - family-names: Waqas
     given-names: Muhammad
+    orcid: "https://orcid.org/0009-0000-9794-1461"
     city: Dallas
     region: TX
     country: US
@@ -30,6 +31,7 @@ preferred-citation:
   authors:
     - family-names: Waqas
       given-names: Muhammad
+      orcid: "https://orcid.org/0009-0000-9794-1461"
   year: 2026
   journal: SoftwareX
   # Fill these in after acceptance:
