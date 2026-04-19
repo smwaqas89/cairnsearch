@@ -71,12 +71,4 @@ paper.
 - System-health metrics: queue status, error rates, estimated costs
 - Automatic alerting on repeated failures or chunk explosions
 
-## [Unreleased]
 
-### Planned
-- Evaluation harness built on BEIR-style benchmarks plus a curated
-  private-document benchmark
-- PDF in-browser preview
-- Document comparison
-- Learned (rather than fixed) hybrid-fusion weights
-- Additional AI features (summarisation, fact extraction)
