@@ -1,0 +1,115 @@
+# cairnsearch Configuration
+# Copy to ~/.config/cairnsearch/config.toml and customize
+
+[general]
+# Where to store the database and logs
+data_dir = "~/.local/share/cairnsearch"
+log_level = "INFO"
+
+[watcher]
+# Debounce rapid file changes (milliseconds)
+debounce_ms = 500
+
+# Folders to watch and index
+folders = [
+    "~/Documents",
+]
+
+# Patterns to ignore (glob syntax)
+ignore_patterns = [
+    "*.tmp",
+    "~$*",
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".DS_Store",
+    "Thumbs.db",
+]
+
+[indexer]
+# Number of worker threads for extraction
+workers = 3
+
+# Hash algorithm for change detection
+hash_algorithm = "sha256"
+
+# Skip files larger than this (MB)
+max_file_size_mb = 100
+
+[ocr]
+# Enable OCR for images and scanned PDFs
+enabled = true
+
+# Tesseract language (eng, deu, fra, etc.)
+language = "eng"
+
+# Characters per page threshold to detect scanned PDFs
+scanned_threshold_chars_per_page = 50
+
+# Cache OCR results
+cache_enabled = true
+
+[search]
+# Default results per page
+default_page_size = 20
+
+# Maximum results per page
+max_page_size = 100
+
+# Characters of context around matches
+snippet_length = 150
+
+# HTML tag for highlighting matches
+highlight_tag = "mark"
+
+[api]
+# API server host
+host = "127.0.0.1"
+
+# API server port
+port = 8080
+
+# CORS origins (for web UI)
+cors_origins = ["http://localhost:3000", "http://127.0.0.1:8080"]
+
+# =============================================================================
+# RAG (Retrieval-Augmented Generation) Settings
+# =============================================================================
+
+[rag]
+# Enable RAG features (ask questions, summarize)
+enabled = true
+
+# Chunking settings
+chunk_size = 500           # Tokens per chunk
+chunk_overlap = 50         # Overlap between chunks
+
+# Embedding settings
+# Options: "local" (sentence-transformers), "ollama", "openai"
+embedding_provider = "local"
+embedding_model = "all-MiniLM-L6-v2"
+
+# Retrieval settings
+top_k = 5                  # Number of chunks to retrieve
+hybrid_search = true       # Combine BM25 + vector search
+bm25_weight = 0.3          # Weight for keyword search
+vector_weight = 0.7        # Weight for semantic search
+
+# LLM settings
+# Options: "none", "ollama", "anthropic", "openai"
+llm_provider = "ollama"
+
+# Ollama settings (if using local LLM)
+ollama_base_url = "http://localhost:11434"
+ollama_model = "llama3.1:8b"
+
+# API settings (if using cloud LLM)
+# Set API keys via environment variables:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   OPENAI_API_KEY=sk-...
+# anthropic_model = "claude-sonnet-4-20250514"
+# openai_model = "gpt-4o-mini"
+
+# Generation settings
+max_context_tokens = 4000  # Max tokens for context
+temperature = 0.1          # Lower = more focused answers

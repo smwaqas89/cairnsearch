@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="cairnsearch - Enterprise Local Document Search with AI">
+    <title>cairnsearch</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles-extra.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </div>
+                <span class="brand-name">cairnsearch</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <button class="nav-btn active" data-view="search" onclick="switchView('search')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <span>Search</span>
+                </button>
+                <button class="nav-btn" data-view="documents" onclick="switchView('documents')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Documents</span>
+                </button>
+                <button class="nav-btn" data-view="settings" onclick="switchView('settings')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <span>Settings</span>
+                </button>
+                <button class="nav-btn" data-view="history" onclick="switchView('history')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>History</span>
+                </button>
+            </nav>
+
+            <!-- Saved Searches -->
+            <div class="sidebar-section">
+                <div class="section-header">
+                    <span>Saved Searches</span>
+                    <button class="icon-btn-sm" onclick="saveCurrentSearch()" title="Save current search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                </div>
+                <div id="saved-searches" class="saved-list">
+                    <div class="empty-message">No saved searches</div>
+                </div>
+            </div>
+
+            <!-- Recent Searches -->
+            <div class="sidebar-section">
+                <div class="section-header"><span>Recent</span></div>
+                <div id="recent-searches" class="recent-list"></div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="privacy-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>100% Local • Private</span>
+                </div>
+                <div class="footer-actions">
+                    <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    </button>
+                    <button class="icon-btn" onclick="openCommandPalette()" title="Command palette (⌘K)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m9 10 2 2-2 2m4 0h2"/></svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Search View -->
+            <div id="view-search" class="view active">
+                <!-- Search Header -->
+                <header class="search-header">
+                    <div class="search-container">
+                        <div class="search-box">
+                            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            <input type="text" id="search-input" placeholder="Search your documents..." autocomplete="off">
+                            <div class="search-mode-toggle">
+                                <button class="mode-btn active" data-mode="search" onclick="setSearchMode('search')">Search</button>
+                                <button class="mode-btn" data-mode="ai" onclick="setSearchMode('ai')">Ask AI</button>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Quick Filters Bar -->
+                <div class="filters-bar" id="filters-bar">
+                    <span class="filters-label">Filter:</span>
+                    <div id="type-filters">
+                        <button class="filter-chip" data-type="pdf" onclick="toggleTypeFilter('pdf')">📄 PDF</button>
+                        <button class="filter-chip" data-type="docx" onclick="toggleTypeFilter('docx')">📝 DOCX</button>
+                        <button class="filter-chip" data-type="xlsx" onclick="toggleTypeFilter('xlsx')">📊 XLSX</button>
+                        <button class="filter-chip" data-type="txt" onclick="toggleTypeFilter('txt')">📃 TXT</button>
+                        <button class="filter-chip" data-type="html" onclick="toggleTypeFilter('html')">🌐 HTML</button>
+                        <button class="filter-chip" data-type="md" onclick="toggleTypeFilter('md')">📑 MD</button>
+                    </div>
+                    <span class="clear-filters" onclick="clearFilters()">Clear all</span>
+                </div>
+
+                <!-- Document Chat Header (shown when chatting with specific doc) -->
+                <div id="document-chat-header" class="hidden">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <!-- Results Area -->
+                <div class="results-area">
+                    <!-- Results Header -->
+                    <div class="results-header">
+                        <span class="results-label" id="results-label">AI Answer</span>
+                        <span class="results-time" id="results-time"></span>
+                        <div class="results-actions">
+                            <button class="icon-btn-sm" onclick="copyResults()" title="Copy">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            </button>
+                            <button class="icon-btn-sm" onclick="downloadResults()" title="Download">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AI Answer Section -->
+                    <div id="ai-answer-section" class="ai-answer-section hidden">
+                        <div class="ai-answer-card">
+                            <div class="ai-answer-header">
+                                <div class="ai-avatar">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M12 6v6l4 2"/>
+                                    </svg>
+                                </div>
+                                <div class="ai-answer-title">
+                                    <span class="ai-label">AI Answer</span>
+                                    <span class="ai-provider" id="ai-provider">Powered by Ollama</span>
+                                </div>
+                            </div>
+                            <div class="ai-loading hidden" id="ai-loading">
+                                <div class="ai-loading-spinner"></div>
+                                <span>Thinking...</span>
+                            </div>
+                            <div class="ai-answer-body" id="ai-answer-body"></div>
+                            
+                            <!-- Sources Section -->
+                            <div class="ai-sources" id="ai-sources">
+                                <div class="sources-header">
+                                    <span class="sources-icon">📚</span>
+                                    <span class="sources-label">SOURCES (<span id="sources-count">0</span>)</span>
+                                </div>
+                                <div class="sources-list" id="sources-list"></div>
+                            </div>
+
+                            <!-- Follow-up Section -->
+                            <div class="ai-followup">
+                                <input type="text" id="followup-input" placeholder="Ask a follow-up question...">
+                                <button class="followup-btn" onclick="askFollowup()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                </button>
+                            </div>
+
+                            <!-- Context Selector -->
+                            <div class="ai-context-selector">
+                                <span class="context-label">AI Context:</span>
+                                <div class="context-chips">
+                                    <button class="context-chip active" data-context="search" onclick="setAIContext('search')">Search Results</button>
+                                    <button class="context-chip" data-context="selected" onclick="setAIContext('selected')">Selected Docs</button>
+                                    <button class="context-chip" data-context="all" onclick="setAIContext('all')">All Documents</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search Results Section -->
+                    <div id="search-results-section" class="search-results-section hidden">
+                        <div id="results-list" class="results-list"></div>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="empty-state" class="empty-state">
+                        <div class="empty-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="64" height="64">
+                                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                            </svg>
+                        </div>
+                        <h3>Search your documents</h3>
+                        <p>Use <strong>Search</strong> for keyword matching or <strong>Ask AI</strong> for intelligent answers</p>
+                        <div class="empty-tips">
+                            <span><kbd>/</kbd> Focus search</span>
+                            <span><kbd>⌘K</kbd> Commands</span>
+                            <span><kbd>Enter</kbd> Search</span>
+                        </div>
+                    </div>
+
+                    <!-- Skeleton Loader -->
+                    <div id="skeleton-loader" class="skeleton-loader hidden">
+                        <div class="skeleton-card">
+                            <div class="skeleton-line w75"></div>
+                            <div class="skeleton-line w50"></div>
+                            <div class="skeleton-line w90"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documents View (NEW) -->
+            <div id="view-documents" class="view">
+                <div class="view-header">
+                    <h2>Indexed Documents</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-outline btn-sm" onclick="exportIndexedFiles()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                            Export
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="loadIndexedFiles()">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="documents-content">
+                    <!-- Documents Toolbar -->
+                    <div class="documents-toolbar">
+                        <div class="toolbar-search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                            <input type="text" id="files-search" placeholder="Filter documents..." oninput="filterIndexedFiles(this.value)">
+                        </div>
+                        <div class="toolbar-filters">
+                            <select id="files-sort" onchange="sortIndexedFiles(this.value)">
+                                <option value="date">Sort by Date</option>
+                                <option value="name">Sort by Name</option>
+                                <option value="type">Sort by Type</option>
+                                <option value="size">Sort by Size</option>
+                            </select>
+                            <select id="files-type-filter" onchange="filterByType(this.value)">
+                                <option value="">All Types</option>
+                                <option value="pdf">PDF</option>
+                                <option value="docx">DOCX</option>
+                                <option value="txt">TXT</option>
+                                <option value="md">Markdown</option>
+                                <option value="xlsx">Excel</option>
+                                <option value="csv">CSV</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Documents Stats -->
+                    <div class="documents-stats">
+                        <div class="stat-item">
+                            <span class="stat-num" id="doc-total-count">0</span>
+                            <span class="stat-text">Total Documents</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num" id="doc-chunk-count">0</span>
+                            <span class="stat-text">Total Chunks</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-num" id="doc-type-count">0</span>
+                            <span class="stat-text">File Types</span>
+                        </div>
+                    </div>
+
+                    <!-- Documents Table -->
+                    <div class="documents-table-container">
+                        <table class="documents-table" id="documents-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-icon"></th>
+                                    <th class="col-name">Document Name</th>
+                                    <th class="col-type">Type</th>
+                                    <th class="col-chunks">Chunks</th>
+                                    <th class="col-date">Indexed</th>
+                                    <th class="col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents-table-body">
+                                <tr class="empty-row">
+                                    <td colspan="6">
+                                        <div class="empty-table-state">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                            <p>No documents indexed yet</p>
+                                            <button class="btn btn-primary btn-sm" onclick="switchView('settings')">Add Folders</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="documents-pagination" id="documents-pagination">
+                        <button class="btn btn-sm btn-outline" onclick="prevFilesPage()" id="btn-prev-page">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+                            Previous
+                        </button>
+                        <span class="page-info" id="files-page-info">Page 1 of 1</span>
+                        <button class="btn btn-sm btn-outline" onclick="nextFilesPage()" id="btn-next-page">
+                            Next
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings View (REDESIGNED) -->
+            <div id="view-settings" class="view">
+                <div class="view-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="settings-content-redesigned">
+                    <!-- Settings Navigation Tabs -->
+                    <div class="settings-tabs">
+                        <button class="settings-tab active" data-tab="indexing" onclick="switchSettingsTab('indexing')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            Indexing
+                        </button>
+                        <button class="settings-tab" data-tab="ai" onclick="switchSettingsTab('ai')">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6v6l4 2"/></svg>
+                            AI Configuration
+                        </button>
+                    </div>
+
+                    <!-- Settings Panels -->
+                    <div class="settings-panels">
+                        <!-- Indexing Panel (Now includes content from General) -->
+                        <div class="settings-panel active" id="panel-indexing">
+                            <!-- Index Status Section (moved from General) -->
+                            <div class="panel-section">
+                                <h3 class="section-title">Index Status</h3>
+                                <p class="section-desc">Overview of your document index</p>
+                                <div class="status-cards">
+                                    <div class="status-card">
+                                        <div class="status-card-icon documents">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                        </div>
+                                        <div class="status-card-content">
+                                            <span class="status-card-value" id="stat-docs">0</span>
+                                            <span class="status-card-label">Documents</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-card">
+                                        <div class="status-card-icon chunks">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                        </div>
+                                        <div class="status-card-content">
+                                            <span class="status-card-value" id="stat-chunks">0</span>
+                                            <span class="status-card-label">Chunks</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-card">
+                                        <div class="status-card-icon pending">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        </div>
+                                        <div class="status-card-content">
+                                            <span class="status-card-value" id="stat-pending">0</span>
+                                            <span class="status-card-label">Pending</span>
+                                        </div>
+                                    </div>
+                                    <div class="status-card">
+                                        <div class="status-card-icon errors">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                        </div>
+                                        <div class="status-card-content">
+                                            <span class="status-card-value" id="stat-errors">0</span>
+                                            <span class="status-card-label">Errors</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Progress Bar -->
+                                <div class="index-progress hidden" id="index-progress">
+                                    <div class="progress-label">
+                                        <span>Indexing in progress...</span>
+                                        <span id="progress-text">0%</span>
+                                    </div>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Indexed Folders Section -->
+                            <div class="panel-section">
+                                <h3 class="section-title">Indexed Folders</h3>
+                                <p class="section-desc">Manage folders that will be indexed</p>
+                                
+                                <div class="folders-manager">
+                                    <div class="drop-zone" id="drop-zone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+                                        <p>Drop folder here or</p>
+                                        <button class="btn btn-primary btn-sm" onclick="openFolderBrowser()">Browse Folders</button>
+                                    </div>
+                                    
+                                    <div class="folders-list" id="folders-list">
+                                        <!-- Folders will be rendered here -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Actions Section (moved from General) -->
+                            <div class="panel-section">
+                                <h3 class="section-title">Quick Actions</h3>
+                                <p class="section-desc">Common indexing operations</p>
+                                <div class="action-buttons">
+                                    <button class="action-btn primary" onclick="startIndexing()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                        <span>Start Indexing</span>
+                                    </button>
+                                    <button class="action-btn" onclick="toggleFileWatcher()" id="btn-watcher">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                        <span>Enable Auto-Watch</span>
+                                    </button>
+                                    <button class="action-btn" onclick="viewErrors()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        <span>View Errors</span>
+                                    </button>
+                                    <button class="action-btn danger" onclick="clearIndex()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        <span>Clear Index</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- File Types Section (moved from General) -->
+                            <div class="panel-section">
+                                <h3 class="section-title">File Types</h3>
+                                <p class="section-desc">Choose which file types to index</p>
+                                <div class="file-types-list">
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="pdf">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📄</span>
+                                            <span class="type-name">PDF</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="docx">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📝</span>
+                                            <span class="type-name">DOCX</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="txt">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📃</span>
+                                            <span class="type-name">TXT</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="md">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📑</span>
+                                            <span class="type-name">Markdown</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="xlsx">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📊</span>
+                                            <span class="type-name">Excel</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="csv">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📊</span>
+                                            <span class="type-name">CSV</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="html">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">🌐</span>
+                                            <span class="type-name">HTML</span>
+                                        </span>
+                                    </label>
+                                    <label class="file-type-toggle">
+                                        <input type="checkbox" checked data-type="json">
+                                        <span class="toggle-label">
+                                            <span class="type-icon">📋</span>
+                                            <span class="type-name">JSON</span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Exclude Patterns Section -->
+                            <div class="panel-section">
+                                <h3 class="section-title">Exclude Patterns</h3>
+                                <p class="section-desc">Files matching these patterns will be ignored</p>
+                                
+                                <div class="patterns-manager">
+                                    <div class="patterns-list" id="exclude-patterns">
+                                        <span class="pattern-tag">*.tmp <button onclick="removePattern(this)">×</button></span>
+                                        <span class="pattern-tag">~$* <button onclick="removePattern(this)">×</button></span>
+                                        <span class="pattern-tag">.git <button onclick="removePattern(this)">×</button></span>
+                                        <span class="pattern-tag">node_modules <button onclick="removePattern(this)">×</button></span>
+                                        <span class="pattern-tag">__pycache__ <button onclick="removePattern(this)">×</button></span>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline" onclick="addExcludePattern()">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Add Pattern
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- AI Configuration Panel -->
+                        <div class="settings-panel" id="panel-ai">
+                            <div class="panel-section">
+                                <div class="section-header-with-badge">
+                                    <div>
+                                        <h3 class="section-title">AI Provider</h3>
+                                        <p class="section-desc">Configure your LLM and embedding providers</p>
+                                    </div>
+                                    <span class="connection-badge" id="ai-status-badge">Not Tested</span>
+                                </div>
+                                
+                                <div class="config-form">
+                                    <div class="form-row">
+                                        <label class="form-label">LLM Provider</label>
+                                        <select id="llm-provider" class="form-select" onchange="updateAIConfigUI()">
+                                            <option value="ollama">Ollama (Local)</option>
+                                            <option value="openai">OpenAI</option>
+                                            <option value="anthropic">Anthropic (Claude)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row" id="ollama-model-group">
+                                        <label class="form-label">Ollama Model</label>
+                                        <select id="ollama-model" class="form-select">
+                                            <option value="llama3.1:8b">llama3.1:8b (Recommended)</option>
+                                            <option value="llama3.2">llama3.2</option>
+                                            <option value="mistral">mistral</option>
+                                            <option value="phi3">phi3</option>
+                                            <option value="gemma2">gemma2</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row hidden" id="openai-model-group">
+                                        <label class="form-label">OpenAI Model</label>
+                                        <select id="openai-model" class="form-select">
+                                            <option value="gpt-4o-mini">GPT-4o-mini (Cheap & Fast)</option>
+                                            <option value="gpt-4o">GPT-4o (Best)</option>
+                                            <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Legacy)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row hidden" id="anthropic-model-group">
+                                        <label class="form-label">Claude Model</label>
+                                        <select id="anthropic-model" class="form-select">
+                                            <option value="claude-sonnet-4-20250514">Claude Sonnet 4 (Recommended)</option>
+                                            <option value="claude-opus-4-20250514">Claude Opus 4 (Best)</option>
+                                            <option value="claude-haiku-3-5-20241022">Claude Haiku 3.5 (Fast & Cheap)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row hidden" id="api-key-note">
+                                        <div class="info-box">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                                            <span>API keys are set via environment variables (OPENAI_API_KEY or ANTHROPIC_API_KEY)</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <label class="form-label">Embedding Provider</label>
+                                        <select id="embedding-provider" class="form-select" onchange="updateEmbeddingConfigUI()">
+                                            <option value="ollama">Ollama (nomic-embed-text)</option>
+                                            <option value="openai">OpenAI</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row hidden" id="openai-embedding-model-group">
+                                        <label class="form-label">OpenAI Embedding Model</label>
+                                        <select id="openai-embedding-model" class="form-select">
+                                            <option value="text-embedding-3-small">text-embedding-3-small (Cheap)</option>
+                                            <option value="text-embedding-3-large">text-embedding-3-large (Best)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button class="btn btn-primary" onclick="saveAIConfig()">Save Settings</button>
+                                        <button class="btn btn-outline" onclick="testAIConnection()">Test Connection</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- RAG Settings Section -->
+                            <div class="panel-section">
+                                <h3 class="section-title">RAG Settings</h3>
+                                <p class="section-desc">Configure retrieval-augmented generation parameters</p>
+                                
+                                <div class="config-form">
+                                    <div class="form-row">
+                                        <label class="form-label">
+                                            <span>Enable Reranking</span>
+                                            <span class="form-label-hint">Improves accuracy but adds latency</span>
+                                        </label>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="reranker-enabled">
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <label class="form-label">Top K Results</label>
+                                        <select id="rag-top-k" class="form-select">
+                                            <option value="3">3 (Fast)</option>
+                                            <option value="5" selected>5 (Balanced)</option>
+                                            <option value="10">10 (Comprehensive)</option>
+                                            <option value="15">15 (Thorough)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <label class="form-label">Chunk Size (tokens)</label>
+                                        <select id="rag-chunk-size" class="form-select">
+                                            <option value="250">250 (Short)</option>
+                                            <option value="500" selected>500 (Default)</option>
+                                            <option value="1000">1000 (Long)</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="form-row">
+                                        <label class="form-label">
+                                            <span>Hybrid Search</span>
+                                            <span class="form-label-hint">Combines BM25 + vector search</span>
+                                        </label>
+                                        <label class="toggle-switch">
+                                            <input type="checkbox" id="hybrid-search" checked>
+                                            <span class="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-actions">
+                                        <button class="btn btn-primary" onclick="saveRAGConfig()">Save RAG Settings</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- History View -->
+            <div id="view-history" class="view">
+                <div class="view-header">
+                    <h2>AI Chat History</h2>
+                    <button class="btn btn-sm btn-danger" onclick="clearChatHistory()">Clear History</button>
+                </div>
+                <div class="history-content">
+                    <div class="history-list" id="history-list">
+                        <div class="no-history-message">No chat history yet. Ask AI some questions!</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Command Palette Modal -->
+    <div id="command-palette" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeCommandPalette()"></div>
+        <div class="command-palette-content">
+            <input type="text" id="command-input" placeholder="Type a command..." oninput="filterCommands(this.value)">
+            <div class="command-list" id="command-list"></div>
+        </div>
+    </div>
+
+    <!-- Folder Browser Modal -->
+    <div id="folder-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeFolderBrowser()"></div>
+        <div class="modal-content folder-browser">
+            <div class="modal-header">
+                <h3>Select Folder</h3>
+                <button class="icon-btn-sm" onclick="closeFolderBrowser()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="breadcrumb" id="folder-breadcrumb"></div>
+            <div class="folder-list" id="folder-contents"></div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeFolderBrowser()">Cancel</button>
+                <button class="btn btn-primary" onclick="selectCurrentFolder()">Select This Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeErrorModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Indexing Errors</h3>
+                <button class="icon-btn-sm" onclick="closeErrorModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="error-list" id="error-list"></div>
+        </div>
+    </div>
+
+    <!-- Document Detail Modal -->
+    <div id="document-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeDocumentModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="doc-modal-title">Document Details</h3>
+                <button class="icon-btn-sm" onclick="closeDocumentModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="document-modal-body" id="doc-modal-body">
+                <!-- Document details will be rendered here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeDocumentModal()">Close</button>
+                <button class="btn btn-outline" onclick="reindexCurrentDocument()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    Re-index
+                </button>
+                <button class="btn btn-primary" onclick="openCurrentDocument()">Open File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Pattern Modal -->
+    <div id="pattern-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closePatternModal()"></div>
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h3>Add Exclude Pattern</h3>
+                <button class="icon-btn-sm" onclick="closePatternModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="form-group" style="padding: 16px;">
+                <label>Pattern (glob syntax)</label>
+                <input type="text" id="new-pattern" placeholder="e.g., *.log, temp/*, .cache">
+                <small>Use * for wildcards. Examples: *.tmp, __pycache__, .git</small>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closePatternModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmAddPattern()">Add Pattern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Document Preview Panel -->
+    <div id="preview-panel" class="hidden">
+        <!-- Content dynamically generated -->
+    </div>
+
+    <!-- Summary Modal -->
+    <div id="summary-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeSummaryModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Document Summary</h3>
+                <button class="icon-btn-sm" onclick="closeSummaryModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="summary-content">
+                <!-- Summary content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Similar Documents Modal -->
+    <div id="similar-modal" class="modal hidden">
+        <div class="modal-backdrop" onclick="closeSimilarModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Similar Documents</h3>
+                <button class="icon-btn-sm" onclick="closeSimilarModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="similar-content">
+                <!-- Similar docs loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>

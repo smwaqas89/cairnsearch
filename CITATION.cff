@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+title: "cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections"
+message: "If you use this software, please cite it using the metadata below."
+type: software
+authors:
+  - family-names: Waqas
+    given-names: Muhammad
+    city: Dallas
+    region: TX
+    country: US
+repository-code: "https://github.com/smwaqas89/cairnsearch"
+url: "https://github.com/smwaqas89/cairnsearch"
+version: "1.0.0"
+date-released: "2026-04-19"
+license: MIT
+keywords:
+  - information-retrieval
+  - retrieval-augmented-generation
+  - hybrid-search
+  - bm25
+  - dense-retrieval
+  - local-llm
+  - privacy
+  - sqlite-fts5
+  - ocr
+  - ollama
+preferred-citation:
+  type: article
+  title: "cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections"
+  authors:
+    - family-names: Waqas
+      given-names: Muhammad
+  year: 2026
+  journal: SoftwareX
+  # Fill these in after acceptance:
+  # volume:
+  # doi:
+  # pages:
