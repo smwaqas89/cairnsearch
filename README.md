@@ -18,7 +18,7 @@
 
 This software is described in a paper submitted to *SoftwareX*:
 
-> Waqas, M. (2026). *cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections.* Submitted.
+> Muhammad Waqas. (2026). *cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections.* Submitted.
 
 If you use cairnsearch in your work, please cite using the `CITATION.cff` metadata in this repository, or via the "Cite this repository" button in the GitHub sidebar.
 
