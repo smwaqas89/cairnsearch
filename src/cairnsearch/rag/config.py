@@ -25,6 +25,14 @@ class RAGConfig:
     
     # Feature toggles
     enabled: bool = True
+
+    # Privacy: when True (the default), cairnsearch makes NO external network
+    # calls. Only local providers (Ollama, local sentence-transformers) are
+    # permitted, and any attempt to use a cloud provider (OpenAI, Anthropic)
+    # is refused before a request is sent. This is the behaviour described in
+    # the published paper: "nothing leaves the machine". Set to False only if
+    # you explicitly want to opt in to cloud providers.
+    strict_local: bool = True
     
     # Chunking settings
     chunk_size: int = 500  # tokens
@@ -45,9 +53,12 @@ class RAGConfig:
     bm25_weight: float = 0.3  # Weight for BM25 in hybrid search
     vector_weight: float = 0.7  # Weight for vector search
     
-    # Reranking settings - disabled by default for speed
+    # Reranking settings - disabled by default for speed.
+    # The default reranker is LLM-based (listwise scoring via the local Ollama
+    # model named below). See rag/reranker.py for details and how to plug in a
+    # true cross-encoder model instead.
     reranker_enabled: bool = False  # Disable for faster responses
-    reranker_model: str = "ollama"
+    reranker_model: str = "ollama"  # "ollama" = listwise LLM reranker (local)
     rerank_top_k: int = 10  # Retrieve this many before reranking
     
     # LLM settings
@@ -83,3 +94,52 @@ def set_rag_config(config: RAGConfig) -> None:
     """Set global RAG config."""
     global _rag_config
     _rag_config = config
+
+
+# --- Privacy / locality helpers -------------------------------------------
+
+# Providers that run entirely on the local machine (no external network egress)
+LOCAL_LLM_PROVIDERS = {LLMProvider.NONE, LLMProvider.OLLAMA}
+LOCAL_EMBEDDING_PROVIDERS = {EmbeddingProvider.LOCAL, EmbeddingProvider.OLLAMA}
+
+
+class CloudProviderBlocked(RuntimeError):
+    """Raised when a cloud provider is requested while strict_local is on."""
+
+
+def is_local_llm_provider(provider: "LLMProvider") -> bool:
+    """Return True if the LLM provider makes no external network calls."""
+    return provider in LOCAL_LLM_PROVIDERS
+
+
+def is_local_embedding_provider(provider: "EmbeddingProvider") -> bool:
+    """Return True if the embedding provider makes no external network calls."""
+    return provider in LOCAL_EMBEDDING_PROVIDERS
+
+
+def ensure_local_or_allowed(provider, kind: str, config: Optional[RAGConfig] = None) -> None:
+    """
+    Guard used before any provider that could make an external network call.
+
+    When ``strict_local`` is enabled (the default), this refuses cloud
+    providers up front so that no request is ever sent off the machine.
+    Pass ``kind="llm"`` or ``kind="embedding"``.
+    """
+    config = config or get_rag_config()
+    if not config.strict_local:
+        return  # user has explicitly opted in to cloud providers
+
+    if kind == "llm":
+        local = is_local_llm_provider(provider)
+    elif kind == "embedding":
+        local = is_local_embedding_provider(provider)
+    else:
+        local = False
+
+    if not local:
+        raise CloudProviderBlocked(
+            f"Cloud {kind} provider '{getattr(provider, 'value', provider)}' is "
+            f"blocked because strict_local mode is enabled (the default). "
+            f"cairnsearch makes no external network calls by default. To use a "
+            f"cloud provider, explicitly set strict_local = false in your config."
+        )

@@ -50,10 +50,14 @@ class SubprocessRunner:
         timeout: int = 300,  # 5 minutes default
         max_retries: int = 1,
         capture_output: bool = True,
+        max_memory_mb: Optional[int] = 2048,   # cap subprocess RAM (sandboxing)
+        max_cpu_seconds: Optional[int] = 300,  # cap subprocess CPU time
     ):
         self.timeout = timeout
         self.max_retries = max_retries
         self.capture_output = capture_output
+        self.max_memory_mb = max_memory_mb
+        self.max_cpu_seconds = max_cpu_seconds
     
     def run(
         self,
@@ -92,14 +96,40 @@ class SubprocessRunner:
                 input_path,
                 output_path,
             ]
-            
+
+            # Sandboxing: run extractors with resource limits and a hardened
+            # environment so that a malicious document cannot exhaust memory,
+            # burn unbounded CPU, or pick up ambient credentials. preexec_fn is
+            # POSIX-only; on Windows we fall back to the timeout alone.
+            preexec = None
+            if os.name == "posix":
+                preexec = self._build_rlimit_preexec()
+
+            hardened_env = {
+                "PATH": os.environ.get("PATH", ""),
+                "HOME": os.environ.get("HOME", ""),
+                "TMPDIR": os.environ.get("TMPDIR", tempfile.gettempdir()),
+                "LANG": os.environ.get("LANG", "C.UTF-8"),
+                # Deliberately omit API keys and other secrets from the
+                # extractor environment.
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONIOENCODING": "utf-8",
+            }
+            # Preserve Tesseract config path if the host set one.
+            for keep in ("TESSDATA_PREFIX", "PYTHONPATH"):
+                if keep in os.environ:
+                    hardened_env[keep] = os.environ[keep]
+
             # Run subprocess
-            result = subprocess.run(
-                cmd,
+            run_kwargs = dict(
                 timeout=self.timeout,
                 capture_output=self.capture_output,
                 text=True,
+                env=hardened_env,
             )
+            if preexec is not None:
+                run_kwargs["preexec_fn"] = preexec
+            result = subprocess.run(cmd, **run_kwargs)
             
             execution_time = (time.time() - start_time) * 1000
             
@@ -216,6 +246,45 @@ class SubprocessRunner:
         
         return last_result
     
+    def _build_rlimit_preexec(self):
+        """
+        Build a preexec_fn that applies POSIX resource limits to the extractor
+        subprocess. This is a sandboxing layer: a malicious or malformed
+        document cannot drive memory or CPU usage without bound.
+        """
+        max_memory_mb = self.max_memory_mb
+        max_cpu_seconds = self.max_cpu_seconds
+
+        def _set_limits():
+            try:
+                import resource
+                if max_memory_mb is not None:
+                    nbytes = max_memory_mb * 1024 * 1024
+                    # Address-space cap (covers most native allocators).
+                    try:
+                        resource.setrlimit(resource.RLIMIT_AS, (nbytes, nbytes))
+                    except (ValueError, OSError):
+                        pass
+                if max_cpu_seconds is not None:
+                    try:
+                        resource.setrlimit(
+                            resource.RLIMIT_CPU,
+                            (max_cpu_seconds, max_cpu_seconds),
+                        )
+                    except (ValueError, OSError):
+                        pass
+                # Never allow the extractor to spawn core dumps.
+                try:
+                    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+                except (ValueError, OSError):
+                    pass
+            except Exception:
+                # Resource limiting is best-effort; never block extraction
+                # because limits could not be set on an exotic platform.
+                pass
+
+        return _set_limits
+
     def _get_runner_script(self) -> str:
         """Get the subprocess runner script."""
         return '''

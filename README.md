@@ -18,7 +18,7 @@
 
 This software is described in a paper submitted to *SoftwareX*:
 
-> Muhammad Waqas. (2026). *cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections.* Submitted.
+> Waqas, M. (2026). *cairnsearch: A privacy-first hybrid search and local RAG system for personal document collections.* Submitted.
 
 If you use cairnsearch in your work, please cite using the `CITATION.cff` metadata in this repository, or via the "Cite this repository" button in the GitHub sidebar.
 
@@ -63,7 +63,28 @@ If you use cairnsearch in your work, please cite using the `CITATION.cff` metada
 - [Ollama](https://ollama.com/) (for AI features)
 - Tesseract OCR (optional, for scanned documents)
 
-### Quick Install
+### One-click install (easiest)
+
+For a non-developer setup, the bundled installer creates a virtual
+environment, installs cairnsearch, and pulls the default Ollama models:
+
+```bash
+# macOS / Linux
+git clone https://github.com/smwaqas89/cairnsearch.git
+cd cairnsearch
+./install.sh
+```
+
+```bat
+REM Windows
+git clone https://github.com/smwaqas89/cairnsearch.git
+cd cairnsearch
+install.bat
+```
+
+The script prints the exact command to start the server when it finishes.
+
+### Quick Install (manual)
 
 ```bash
 # Clone the repository
@@ -89,7 +110,7 @@ Open http://localhost:8080 in your browser.
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Download required models
-ollama pull llama3.2
+ollama pull llama3.1:8b
 ollama pull nomic-embed-text
 
 # Install cairnsearch with RAG support
@@ -258,6 +279,64 @@ embedding_model = "nomic-embed-text"
 
 ---
 
+## 🔒 Privacy & Architecture Notes
+
+### Local-only by default
+
+cairnsearch makes **no external network calls** by default. The `strict_local`
+setting (in `[rag]`, default `true`) enforces this: cloud providers (OpenAI,
+Anthropic) are refused before any request is sent — in the LLM factory, the
+embedder factory, and the connection-test and config API endpoints. Document
+content, queries, and embeddings stay on your machine.
+
+To opt in to a cloud provider (your data would then be sent to it), set
+`strict_local = false` in your config and supply the relevant API key via an
+environment variable.
+
+### Reranking
+
+Reranking is **disabled by default** for speed. When enabled, the default
+reranker is a **local LLM-based (listwise) reranker**: it asks the local Ollama
+model to score each candidate chunk's relevance, keeping the rerank step fully
+local with no extra model download. This differs from a classical
+*cross-encoder* reranker; a true cross-encoder
+(e.g. `cross-encoder/ms-marco-MiniLM-L-6-v2`) can be plugged in by implementing
+`BaseReranker` in `src/cairnsearch/rag/reranker.py`.
+
+### Chunking
+
+The default chunk size is **500 tokens with 50-token overlap**. This balances
+retrieval granularity (small enough that a retrieved chunk is mostly relevant
+to the query) against context coherence (large enough to keep a clause or
+paragraph intact). Tables are chunked on row boundaries only, never mid-row.
+Both values are configurable under `[rag]`. See [docs/SCHEMA.md](docs/SCHEMA.md)
+for the full chunk schema and the OCR-bounding-box → index mapping.
+
+### PII detection
+
+The PII detector flags twelve classes of sensitive data (SSN, credit card,
+email, phone, address, date of birth, passport, driver's licence, bank account,
+IP, name, medical record) using regular expressions and lightweight heuristics.
+It is intentionally a **recall-oriented safety net** for flagging and redaction
+review — not a high-precision classifier. Expect false positives (e.g. numbers
+that look like account numbers) and some false negatives on unusual formats. It
+should not be relied on as the sole control for regulatory compliance.
+
+### Resource handling
+
+If the local LLM runs out of memory or cannot be reached, cairnsearch returns a
+clear, actionable error (for example, suggesting a smaller model such as
+`llama3.2:1b`) rather than crashing silently.
+
+### Extractor sandboxing
+
+External extractors (OCR, archive handling) run in isolated subprocesses with
+POSIX resource limits (memory, CPU time, no core dumps) and a stripped
+environment that withholds API keys. This contains the impact of a malformed or
+malicious document.
+
+---
+
 ## 📊 Query Syntax
 
 | Syntax | Example | Description |
@@ -311,7 +390,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
 
 ## 📜 License
 
-[MIT License](LICENSE) © 2025 Muhammad Waqas
+[MIT License](LICENSE) © 2026 Muhammad Waqas
 
 ---
 
@@ -328,5 +407,6 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues and solutions.
 
 **[⬆ Back to Top](#-cairnsearch)**
 
+Made with ❤️ for privacy
 
 </div>

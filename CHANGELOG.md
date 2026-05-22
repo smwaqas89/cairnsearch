@@ -5,6 +5,48 @@ All notable changes to cairnsearch will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-05-21
+
+Post-publication maintenance release addressing peer-review feedback on the
+SoftwareX paper and aligning runtime behaviour with the paper's privacy claims.
+No breaking changes.
+
+### Privacy / security
+- Added `strict_local` mode (default **on**). When enabled, cairnsearch makes
+  **no external network calls**: cloud providers (OpenAI, Anthropic) are
+  refused before any request is sent, in the LLM factory, the embedder factory,
+  the `/api/rag/test-connection` endpoint, and the `/api/rag/config` endpoint.
+  This guarantees the "nothing leaves the machine" behaviour described in the
+  paper unless the user explicitly opts in by setting `strict_local = false`.
+- Hardened the extractor subprocess sandbox: POSIX resource limits on memory
+  (`RLIMIT_AS`), CPU time (`RLIMIT_CPU`), and core dumps, plus a stripped
+  environment that withholds API keys and other secrets from extractors. This
+  reduces the blast radius of a malicious or malformed PDF/Office document.
+
+### Reliability
+- Added informative error handling for local-LLM resource exhaustion. Ollama
+  out-of-memory, model-not-found, connection, and timeout conditions now raise
+  clear, actionable errors (e.g. "try a smaller model such as llama3.2:1b")
+  instead of failing silently or crashing.
+
+### Documentation
+- Added `docs/SCHEMA.md` documenting the chunk JSON schema and the mapping from
+  raw extraction output (including OCR bounding boxes and table structure) into
+  the index.
+- Clarified that the default reranker is a local LLM-based (listwise) reranker
+  rather than a separate cross-encoder model, and documented how to substitute
+  a true cross-encoder.
+- Documented `strict_local` in `config.example.toml`.
+
+### Developer experience
+- Added one-click installers (`install.sh`, `install.bat`) that set up a
+  virtual environment, install cairnsearch, **launch Ollama in the background**,
+  pull the default models, and offer to start the server and open the web UI
+  automatically — removing command-line friction for non-developer users.
+- Fixed a `RuntimeWarning` on CLI startup caused by importing `cli.main` at
+  package import time; the CLI is now launched via `python -m cairnsearch.cli`
+  (added `cli/__main__.py`) and `app` is imported lazily.
+
 ## [1.0.0] - 2026-04-19
 
 First public release. This is the version described in the accompanying SoftwareX
@@ -71,4 +113,12 @@ paper.
 - System-health metrics: queue status, error rates, estimated costs
 - Automatic alerting on repeated failures or chunk explosions
 
+## [Unreleased]
 
+### Planned
+- Evaluation harness built on BEIR-style benchmarks plus a curated
+  private-document benchmark
+- PDF in-browser preview
+- Document comparison
+- Learned (rather than fixed) hybrid-fusion weights
+- Additional AI features (summarisation, fact extraction)

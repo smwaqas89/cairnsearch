@@ -457,12 +457,34 @@ async def test_connection(request: TestConnectionRequest) -> dict:
     just checking if credentials exist.
     """
     import os
-    
+    from cairnsearch.rag.config import get_rag_config
+
+    rag_config = get_rag_config()
     llm_available = False
     llm_error = None
     embeddings_available = False
     embeddings_error = None
-    
+
+    # Privacy guard: in strict_local mode (the default) cairnsearch must not
+    # make any external network call. Refuse to probe cloud providers here so
+    # that testing a connection never leaks the fact that cairnsearch is running
+    # to a third-party endpoint.
+    if rag_config.strict_local and request.provider not in ("ollama",):
+        return {
+            "llm": {
+                "provider": request.provider,
+                "model": request.model,
+                "available": False,
+                "error": (
+                    f"Provider '{request.provider}' is a cloud provider and is "
+                    f"blocked in strict_local mode (the default). cairnsearch "
+                    f"makes no external network calls by default. Set "
+                    f"strict_local = false in your config to enable cloud providers."
+                ),
+            },
+            "embeddings": {"available": False, "error": "strict_local mode enabled"},
+        }
+
     # Test LLM connection based on selected provider
     if request.provider == "ollama":
         try:
@@ -615,7 +637,24 @@ async def update_rag_config(request: RAGConfigRequest) -> dict:
     from cairnsearch.rag.config import get_rag_config, set_rag_config, LLMProvider, EmbeddingProvider
     
     config = get_rag_config()
-    
+
+    # Privacy guard: in strict_local mode (the default), refuse to switch to a
+    # cloud LLM or embedding provider. This keeps the running system aligned
+    # with the "no external network calls" guarantee.
+    if config.strict_local:
+        requested_llm = (request.llm_provider or "").lower()
+        requested_emb = (request.embedding_provider or "").lower()
+        if requested_llm in ("openai", "anthropic") or requested_emb == "openai":
+            return {
+                "message": (
+                    "Refused: cloud providers are blocked in strict_local mode "
+                    "(the default). Set strict_local = false in your config to "
+                    "enable cloud providers. cairnsearch makes no external "
+                    "network calls by default."
+                ),
+                "config": None,
+            }
+
     # Update only provided fields
     if request.reranker_enabled is not None:
         config.reranker_enabled = request.reranker_enabled

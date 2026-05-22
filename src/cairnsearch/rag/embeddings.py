@@ -225,7 +225,11 @@ def get_embedder(provider: Optional[EmbeddingProvider] = None) -> BaseEmbedder:
     """Get embedder based on configuration."""
     config = get_rag_config()
     provider = provider or config.embedding_provider
-    
+
+    # Privacy guard: refuse cloud embedding providers when strict_local is on.
+    from .config import ensure_local_or_allowed
+    ensure_local_or_allowed(provider, kind="embedding", config=config)
+
     if provider == EmbeddingProvider.LOCAL:
         try:
             import sentence_transformers

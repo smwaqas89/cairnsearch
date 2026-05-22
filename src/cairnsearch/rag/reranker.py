@@ -1,4 +1,14 @@
-"""Reranking for improved retrieval accuracy using Ollama."""
+"""Reranking for improved retrieval accuracy.
+
+Note on terminology: the accompanying paper refers to this stage as a
+"cross-encoder reranker". In this implementation the default reranker is an
+LLM-based (listwise) reranker: it prompts the locally hosted Ollama model to
+score the relevance of each candidate chunk to the query, keeping reranking
+fully local and avoiding a separate cross-encoder model download. A true
+cross-encoder (e.g. a sentence-transformers ``cross-encoder/ms-marco-*`` model)
+can be substituted by implementing :class:`BaseReranker`; this is left as an
+optional extension. Reranking is disabled by default.
+"""
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional

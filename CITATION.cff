@@ -5,13 +5,12 @@ type: software
 authors:
   - family-names: Waqas
     given-names: Muhammad
-    orcid: "https://orcid.org/0009-0000-9794-1461"
     city: Dallas
     region: TX
     country: US
 repository-code: "https://github.com/smwaqas89/cairnsearch"
 url: "https://github.com/smwaqas89/cairnsearch"
-version: "1.0.0"
+version: "1.1.0"
 date-released: "2026-04-19"
 license: MIT
 keywords:
@@ -31,7 +30,6 @@ preferred-citation:
   authors:
     - family-names: Waqas
       given-names: Muhammad
-      orcid: "https://orcid.org/0009-0000-9794-1461"
   year: 2026
   journal: SoftwareX
   # Fill these in after acceptance:

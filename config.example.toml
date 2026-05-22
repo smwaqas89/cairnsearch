@@ -80,6 +80,15 @@ cors_origins = ["http://localhost:3000", "http://127.0.0.1:8080"]
 # Enable RAG features (ask questions, summarize)
 enabled = true
 
+# Privacy: strict local mode (DEFAULT: true)
+# When true, cairnsearch makes NO external network calls. Only local providers
+# (Ollama, local sentence-transformers) are allowed; cloud providers (OpenAI,
+# Anthropic) are refused before any request is sent. This matches the
+# "nothing leaves the machine" guarantee. Set to false ONLY if you explicitly
+# want to opt in to cloud providers (your document content and queries would
+# then be sent to that provider).
+strict_local = true
+
 # Chunking settings
 chunk_size = 500           # Tokens per chunk
 chunk_overlap = 50         # Overlap between chunks
@@ -104,6 +113,8 @@ ollama_base_url = "http://localhost:11434"
 ollama_model = "llama3.1:8b"
 
 # API settings (if using cloud LLM)
+# NOTE: cloud providers require strict_local = false (see above). By default
+# they are blocked so that no data leaves the machine.
 # Set API keys via environment variables:
 #   ANTHROPIC_API_KEY=sk-ant-...
 #   OPENAI_API_KEY=sk-...

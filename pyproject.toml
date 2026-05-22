@@ -1,6 +1,6 @@
 [project]
 name = "cairnsearch"
-version = "1.0.0"
+version = "1.1.0"
 description = "Privacy-first hybrid search and local RAG over personal document collections (BM25 + dense retrieval + local LLM via Ollama)."
 requires-python = ">=3.11"
 dependencies = [

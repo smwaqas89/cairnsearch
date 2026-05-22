@@ -10,6 +10,56 @@ from .config import get_rag_config, LLMProvider
 logger = logging.getLogger(__name__)
 
 
+class LLMError(RuntimeError):
+    """Base class for recoverable LLM errors with user-facing messages."""
+
+
+class LLMUnavailableError(LLMError):
+    """The LLM backend (e.g. Ollama) could not be reached."""
+
+
+class LLMResourceError(LLMError):
+    """The LLM ran out of memory (RAM/VRAM) or otherwise failed to load."""
+
+
+class LLMTimeoutError(LLMError):
+    """The LLM took too long to respond (often a memory-pressure symptom)."""
+
+
+def _interpret_ollama_error(exc, model: str) -> LLMError:
+    """
+    Turn an httpx.HTTPStatusError from Ollama into an actionable error.
+
+    Ollama returns 500 with a message containing 'memory'/'OOM' when a model
+    does not fit in available RAM/VRAM, rather than crashing silently.
+    """
+    status = exc.response.status_code if exc.response is not None else None
+    body = ""
+    try:
+        body = exc.response.text or ""
+    except Exception:
+        pass
+    low = body.lower()
+
+    if any(tok in low for tok in ("out of memory", "oom", "not enough memory",
+                                  "cudamalloc", "insufficient memory",
+                                  "failed to allocate", "system memory")):
+        return LLMResourceError(
+            f"The model '{model}' ran out of memory (RAM/VRAM). "
+            f"Try a smaller model such as llama3.2:1b, close other "
+            f"applications, or reduce the context size. (Ollama: {body[:200]})"
+        )
+    if status == 404:
+        return LLMUnavailableError(
+            f"Model '{model}' is not installed in Ollama. "
+            f"Install it with: ollama pull {model}"
+        )
+    return LLMError(
+        f"Ollama returned an error (HTTP {status}) for model '{model}': "
+        f"{body[:200]}"
+    )
+
+
 class BaseLLM(ABC):
     """Abstract base class for LLM providers."""
     
@@ -52,17 +102,32 @@ class OllamaLLM(BaseLLM):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         
-        response = httpx.post(
-            f"{self.base_url}/api/chat",
-            json={
-                "model": self.model,
-                "messages": messages,
-                "stream": False,
-                "options": {"temperature": self.temperature, "num_ctx": 8192},
-            },
-            timeout=120.0,
-        )
-        response.raise_for_status()
+        try:
+            response = httpx.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": self.temperature, "num_ctx": 8192},
+                },
+                timeout=120.0,
+            )
+            response.raise_for_status()
+        except httpx.ConnectError as e:
+            raise LLMUnavailableError(
+                f"Cannot reach Ollama at {self.base_url}. Is it running? "
+                f"Start it with 'ollama serve'. ({e})"
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise _interpret_ollama_error(e, self.model) from e
+        except httpx.ReadTimeout as e:
+            raise LLMTimeoutError(
+                f"Ollama timed out generating a response with model "
+                f"'{self.model}'. The model may be too large for available "
+                f"memory; try a smaller model (e.g. llama3.2:1b)."
+            ) from e
+
         result = response.json()["message"]["content"]
         logger.info(f"[LLM RESPONSE] Ollama returned {len(result)} chars")
         return result
@@ -77,17 +142,41 @@ class OllamaLLM(BaseLLM):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         
-        with httpx.stream(
-            "POST",
-            f"{self.base_url}/api/chat",
-            json={"model": self.model, "messages": messages, "stream": True, "options": {"temperature": self.temperature, "num_ctx": 8192}},
-            timeout=120.0,
-        ) as response:
-            for line in response.iter_lines():
-                if line:
-                    data = json.loads(line)
-                    if "message" in data and "content" in data["message"]:
-                        yield data["message"]["content"]
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self.base_url}/api/chat",
+                json={"model": self.model, "messages": messages, "stream": True, "options": {"temperature": self.temperature, "num_ctx": 8192}},
+                timeout=120.0,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if line:
+                        data = json.loads(line)
+                        if "message" in data and "content" in data["message"]:
+                            yield data["message"]["content"]
+                        # Ollama signals an out-of-memory / load failure via an
+                        # "error" field in the stream rather than an HTTP status.
+                        if "error" in data:
+                            raise LLMResourceError(
+                                f"Ollama reported an error while generating with "
+                                f"model '{self.model}': {data['error']}. If this is "
+                                f"a memory error, try a smaller model (e.g. "
+                                f"llama3.2:1b)."
+                            )
+        except httpx.ConnectError as e:
+            raise LLMUnavailableError(
+                f"Cannot reach Ollama at {self.base_url}. Is it running? "
+                f"Start it with 'ollama serve'. ({e})"
+            ) from e
+        except httpx.HTTPStatusError as e:
+            raise _interpret_ollama_error(e, self.model) from e
+        except httpx.ReadTimeout as e:
+            raise LLMTimeoutError(
+                f"Ollama timed out streaming a response with model "
+                f"'{self.model}'. The model may be too large for available "
+                f"memory; try a smaller model (e.g. llama3.2:1b)."
+            ) from e
     
     @property
     def is_available(self) -> bool:
@@ -289,7 +378,11 @@ def get_llm(provider: Optional[LLMProvider] = None) -> BaseLLM:
     """Get LLM based on configuration."""
     config = get_rag_config()
     provider = provider or config.llm_provider
-    
+
+    # Privacy guard: refuse cloud LLM providers when strict_local is on.
+    from .config import ensure_local_or_allowed
+    ensure_local_or_allowed(provider, kind="llm", config=config)
+
     if provider == LLMProvider.OLLAMA:
         return OllamaLLM()
     elif provider == LLMProvider.ANTHROPIC:
